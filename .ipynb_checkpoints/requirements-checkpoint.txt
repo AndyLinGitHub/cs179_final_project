@@ -1,6 +1,0 @@
-gymnasium
-numpy
-torch
-tensorboard
-stable-baselines3
-PyOpenGL
