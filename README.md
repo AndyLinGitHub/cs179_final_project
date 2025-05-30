@@ -1,5 +1,19 @@
 # cs179_final_project
-## CPU Demo
+
+## All features planned for the GPU version
+- Real-time state updates for each cell
+- Online policy updates with PPO
+- Interactive GUI using OpenGL
+
+## Comments explaining parallelization strategy
+- Network Policy Inference: Parallel on matrix multiplication and batch
+- PPO Loss Calculation: Parallel on batch
+
+## Test cases and verification methods
+- Pregenerate test cases using python
+
+## Clear running instructions
+### CPU Demo
 ```
 # On Ubuntu with a monitor
 git clone https://github.com/AndyLinGitHub/cs179_final_project.git

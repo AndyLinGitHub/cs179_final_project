@@ -15,9 +15,9 @@ from OpenGL.GLU import *
 
 writer = SummaryWriter("runs/nca")
 window_size = 1024
-n = 8
+n = 128
 N = n
-K = 5
+K = 7
 
 class ConvBetaActorCritic(nn.Module):
     def __init__(self, K, act_dim=4):
@@ -72,12 +72,53 @@ def reward_function(img, img_diff):
     with torch.no_grad():
         _, N, _ = img.shape
         new_img = torch.clamp(img + img_diff, 0.0, 1.0)
-        total_rewards = img.sum(dim=0).flatten()
-        total_rewards_new = new_img.sum(dim=0).flatten()
-        done = (total_rewards_new == 4)
+        #total_rewards = img.sum(dim=0).flatten()
+        #total_rewards_new = new_img.sum(dim=0).flatten()
+        total_rewards = symmetry_reward(img).flatten()
+        total_rewards_new = symmetry_reward(new_img).flatten()
+        done = (total_rewards_new <= 0.01)
 
     return total_rewards_new, total_rewards_new - total_rewards, done
+
+def symmetry_reward(img: torch.Tensor) -> torch.Tensor:
+    with torch.no_grad():
+        _, N, _ = img.shape
+        flipped_h = torch.flip(img, dims=[2])
+        flipped_v = torch.flip(img, dims=[1])
+
+        reward_h = -abs(img - flipped_h).sum(dim=0)
+        reward_v = -abs(img - flipped_v).sum(dim=0)
+
+    return (reward_h + reward_v) / 2
+
+def contrast_reward(img: torch.Tensor) -> torch.Tensor:
+    global_avg = img.mean(dim=(1, 2), keepdim=True)  # (4, 1, 1)
+    deviation = (img - global_avg)  # (4, N, N)
+
+    # Sum across channels (or use mean)
+    reward = deviation.sum(dim=0)  # (N, N)
+
+    return reward
+
+def dominant_reward(img: torch.Tensor) -> torch.Tensor:
+    R, G, B = img[0], img[1], img[2]
     
+    # 1. Find global dominant channel
+    total_R = R.sum()
+    total_G = G.sum()
+    total_B = B.sum()
+    
+    global_max_idx = torch.argmax(torch.tensor([total_R, total_G, total_B]))
+
+    # 2. Find per-pixel dominant channel
+    stacked = torch.stack([R, G, B], dim=0)  # (3, N, N)
+    pixel_max_idx = stacked.argmax(dim=0)    # (N, N) values in {0, 1, 2}
+
+    # 3. Reward where pixel max matches global max
+    reward = (pixel_max_idx == global_max_idx).float()
+
+    return reward
+
 lr = 1e-3
 n_envs = N*N
 n_steps = 128
@@ -91,7 +132,7 @@ policy = ConvBetaActorCritic(K).to(device)
 optim = Adam(policy.parameters(), lr=lr)
 buffer = RolloutBuffer(
     buffer_size = n_steps,
-    observation_space = gym.spaces.Box(low=0, high=1, shape=(4, 5, 5), dtype=np.float32),
+    observation_space = gym.spaces.Box(low=0, high=1, shape=(4, K, K), dtype=np.float32),
     action_space = gym.spaces.Box(low=0.0, high=1.0, shape=(4,), dtype=np.float32),
     device = device,
     gae_lambda = gae_lambda,
