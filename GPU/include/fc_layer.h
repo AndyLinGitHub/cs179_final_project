@@ -1,9 +1,6 @@
 #pragma once
 #include "layer.h"
 #include <cublas_v2.h>
-#include <thrust/device_vector.h>
-#include <thrust/fill.h>
-#include <thrust/device_ptr.h>
 
 class FullyConnected : public Layer {
 public:
