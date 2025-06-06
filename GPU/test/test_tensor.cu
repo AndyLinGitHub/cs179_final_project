@@ -1,41 +1,40 @@
-// test/test_tensor.cpp
-#include "tensor.h"
 #include <cassert>
 #include <cmath>
 #include <iostream>
 #include <vector>
+#include "tensor.h"
 
-// ── simple kernel to fill a device array ────────────────────────
 __global__ void fill_kernel(float* data, int n, float val) {
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
     if (idx < n) data[idx] = val;
 }
 
 int main() {
-    constexpr int N = 2, C = 3, H = 4, W = 5;
-    Tensor t(N, C, H, W);                     // allocate device memory
+    int N = 2, C = 3, H = 4, W = 5;
+    Tensor t(N, C, H, W);
+
     const int total = N * C * H * W;
-    const float initVal = 3.14f;
+    const float value = 4.2f;
 
-    // 1) fill with known value on GPU
+    // fill with known value on GPU
     int threads = 256, blocks = (total + threads - 1) / threads;
-    fill_kernel<<<blocks, threads>>>(t.data, total, initVal);
-    CUDA_CALL(cudaDeviceSynchronize());
+    fill_kernel<<<blocks, threads>>>(t.data, total, value);
 
-    // 2) verify host-side that every element == initVal
+    // verify values
     std::vector<float> host(total);
     CUDA_CALL(cudaMemcpy(host.data(), t.data, t.bytes(), cudaMemcpyDeviceToHost));
     for (float v : host) {
-        assert(std::fabs(v - initVal) < 1e-6f);
+        assert(std::fabs(v - value) < 1e-6f);
     }
 
-    // 3) zero-out and 4) verify all zeros
+    // zero-out
     t.zero();
     CUDA_CALL(cudaMemcpy(host.data(), t.data, t.bytes(), cudaMemcpyDeviceToHost));
     for (float v : host) {
         assert(v == 0.0f);
     }
 
-    std::cout << "Tensor fill / zero tests passed!\n";
+    std::cout << "Tensor tests passed!\n";
+
     return 0;
 }

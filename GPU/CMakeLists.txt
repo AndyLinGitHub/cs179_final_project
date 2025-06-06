@@ -6,7 +6,7 @@ set(CMAKE_CUDA_STANDARD 17)
 set(CMAKE_CUDA_ARCHITECTURES native)
 
 # ── CUDA & cuDNN/cuBLAS ───────────────────────────────────
-find_package(CUDAToolkit REQUIRED COMPONENTS cublas)
+find_package(CUDAToolkit REQUIRED)
 find_library(CUDNN_LIBRARY cudnn
     HINTS ${CUDAToolkit_LIBRARY_DIR}
           /usr/lib
@@ -15,7 +15,7 @@ find_library(CUDNN_LIBRARY cudnn
           "$ENV{CUDA_PATH}/lib/x64")
 
 
-# ── Tensor Test ───────────────────────────────────
+# Tensor Test
 add_executable(test_tensor test/test_tensor.cu src/tensor.cpp)
 
 target_include_directories(test_tensor
@@ -30,7 +30,7 @@ target_link_libraries(test_tensor
         ${CUDNN_LIBRARY}
 )
 
-# ── Parameter Test ───────────────────────────────────
+# Parameter Test
 add_executable(test_parameter test/test_parameter.cpp src/parameter.cpp)
 
 target_include_directories(test_parameter
@@ -39,53 +39,99 @@ target_include_directories(test_parameter
 )
 
 target_link_libraries(test_parameter
-    PRIVATE
+     PRIVATE
         CUDA::cudart
         CUDA::cublas
         ${CUDNN_LIBRARY}
 )
 
-# ── Conv Layer Test ───────────────────────────────────
-add_executable(test_conv_layer test/test_conv_layer.cpp src/conv_layer.cpp src/tensor.cpp src/parameter.cpp)
-
-target_include_directories(test_conv_layer
+# Relu Test
+add_executable(test_relu test/test_relu.cpp src/relu.cpp src/tensor.cpp src/parameter.cpp)
+    
+target_include_directories(test_relu
     PRIVATE
         ${PROJECT_SOURCE_DIR}/include
 )
 
-target_link_libraries(test_conv_layer
+target_link_libraries(test_relu
     PRIVATE
         CUDA::cudart
         CUDA::cublas
         ${CUDNN_LIBRARY}
 )
 
-# ── Relu Layer Test ───────────────────────────────────
-add_executable(test_relu_layer test/test_relu_layer.cpp src/relu_layer.cpp src/tensor.cpp src/parameter.cpp)
+# SoftPlus Add 1 Test
+add_executable(test_softplus_add1 test/test_softplus_add1.cpp src/softplus_add1.cu src/tensor.cpp src/parameter.cpp)
 
-target_include_directories(test_relu_layer
+target_include_directories(test_softplus_add1
     PRIVATE
         ${PROJECT_SOURCE_DIR}/include
 )
 
-target_link_libraries(test_relu_layer
+target_link_libraries(test_softplus_add1
     PRIVATE
         CUDA::cudart
         CUDA::cublas
         ${CUDNN_LIBRARY}
 )
 
-# ── FC Layer Test ───────────────────────────────────
-add_executable(test_fc_layer test/test_fc_layer.cpp src/fc_layer.cu src/tensor.cpp src/parameter.cpp)
+# # ── Conv Layer Test ───────────────────────────────────
+# add_executable(test_conv_layer test/test_conv_layer.cpp src/conv_layer.cpp src/tensor.cpp src/parameter.cpp)
 
-target_include_directories(test_fc_layer
-    PRIVATE
-        ${PROJECT_SOURCE_DIR}/include
-)
+# target_include_directories(test_conv_layer
+#     PRIVATE
+#         ${PROJECT_SOURCE_DIR}/include
+# )
 
-target_link_libraries(test_fc_layer
-    PRIVATE
-        CUDA::cudart
-        CUDA::cublas
-        ${CUDNN_LIBRARY}
-)
+# target_link_libraries(test_conv_layer
+#     PRIVATE
+#         CUDA::cudart
+#         CUDA::cublas
+#         ${CUDNN_LIBRARY}
+# )
+
+# # ── Relu Layer Test ───────────────────────────────────
+# add_executable(test_relu_layer test/test_relu_layer.cpp src/relu_layer.cpp src/tensor.cpp src/parameter.cpp)
+
+# target_include_directories(test_relu_layer
+#     PRIVATE
+#         ${PROJECT_SOURCE_DIR}/include
+# )
+
+# target_link_libraries(test_relu_layer
+#     PRIVATE
+#         CUDA::cudart
+#         CUDA::cublas
+#         ${CUDNN_LIBRARY}
+# )
+
+# # ── SoftPlus Layer Test ───────────────────────────────────
+# add_executable(test_softplus_layer test/test_softplus_layer.cpp src/softplus_layer.cu src/tensor.cpp src/parameter.cpp)
+
+# target_include_directories(test_softplus_layer
+#     PRIVATE
+#         ${PROJECT_SOURCE_DIR}/include
+# )
+
+# target_link_libraries(test_softplus_layer
+#     PRIVATE
+#         CUDA::cudart
+#         CUDA::cublas
+#         ${CUDNN_LIBRARY}
+# )
+
+# # ── Beta Dist Test ───────────────────────────────────
+# add_executable(test_beta_dist test/test_beta_dist.cpp src/beta_dist.cu src/beta_dist_kernel.cuh src/tensor.cpp)
+
+# target_include_directories(test_beta_dist
+#     PRIVATE
+#         ${PROJECT_SOURCE_DIR}/include
+# )
+
+# target_link_libraries(test_beta_dist
+#     PRIVATE
+#         CUDA::cudart
+#         CUDA::curand
+#         CUDA::cublas
+#         ${CUDNN_LIBRARY}
+# )
