@@ -1,1 +1,1 @@
-#define THREAD_NUM 256
+#define THREAD_PER_BLOCK 256

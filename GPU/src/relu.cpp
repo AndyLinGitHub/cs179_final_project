@@ -1,6 +1,6 @@
 #include "relu.h"
 
-Relu:: Relu(cudaStream_t stream) : stream_(stream) {
+Relu:: Relu() {
     CUDNN_CALL(cudnnCreateActivationDescriptor(&actDesc));
     CUDNN_CALL(cudnnSetActivationDescriptor(actDesc, CUDNN_ACTIVATION_RELU, CUDNN_PROPAGATE_NAN, 0.0));
 }
@@ -14,8 +14,8 @@ Relu:: ~Relu() {
     cudnnDestroyActivationDescriptor(actDesc);
 }
 
-Tensor* Relu::forward(Tensor* x, cudnnHandle_t handle) {
-    CUDNN_CALL(cudnnSetStream(handle, stream_));
+Tensor* Relu:: forward(Tensor* x, cudnnHandle_t handle, cudaStream_t stream) {
+    CUDNN_CALL(cudnnSetStream(handle, stream));
 
     x_cache = x;
     if (!y) y = new Tensor(x->n(), x->c(), x->h(), x->w());
@@ -26,8 +26,8 @@ Tensor* Relu::forward(Tensor* x, cudnnHandle_t handle) {
     return y;
 }
 
-Tensor* Relu::backward(Tensor* dy, cudnnHandle_t handle) {
-    CUDNN_CALL(cudnnSetStream(handle, stream_));
+Tensor* Relu:: backward(Tensor* dy, cudnnHandle_t handle, cudaStream_t stream) {
+    CUDNN_CALL(cudnnSetStream(handle, stream));
     
     if (!dx) dx = new Tensor(x_cache->n(), x_cache->c(), x_cache->h(), x_cache->w());
     const float alpha = 1.0f, beta = 0.0f;

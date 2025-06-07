@@ -1,86 +1,55 @@
-import torch, numpy as np
+import torch
 from torch.distributions import Beta
 
-# Create tensors that track gradients
-alpha = torch.tensor(
-    np.arange(1, 1024 + 1, dtype=float).reshape(256, 4),
-    requires_grad=True
-)
-beta = torch.tensor(
-    np.arange(1, 2048 + 1, 2, dtype=float).reshape(256, 4),
-    requires_grad=True
-)
-# Distribution, sample (rsample() keeps the re-parameterisation trick)
-dist    = Beta(alpha, beta)
+B = 1024
+dim = 4
+total = B*dim
+
+alpha = torch.arange(total, dtype=torch.float32, requires_grad=True).reshape(B, dim) + 1
+beta = torch.arange(total, dtype=torch.float32, requires_grad=True).reshape(B, dim) + 2
+
+dist = Beta(alpha, beta)
 with torch.no_grad():
-    action  = dist.rsample()                       # shape (256, 4)
+    action = dist.rsample()
+    logp = dist.log_prob(action).sum(-1)
+    entropy = dist.entropy().sum(-1)
 
-action = torch.ones((256, 4), dtype=torch.float32, requires_grad=False) / 2
-#logp = dist.log_prob(action).sum(-1)
-entropy = dist.entropy()
-print(entropy.shape)
-entropy = entropy.sum(-1)
-#print(entropy.detach().numpy().mean())
+action = list(action.detach().numpy().flatten())
+logp = list(logp.detach().numpy().flatten())
+entropy = list(entropy.detach().numpy().flatten())
+with open("beta_dist_action.txt", "w") as f:
+    f.write(" ".join(map(str, action)))
 
-#dlogp = torch.ones(256, dtype=torch.float32, requires_grad=True)
-#grad_x = torch.autograd.grad(outputs=logp, inputs=(alpha, beta), grad_outputs=dlogp)
-#grad_alpha, grad_beta = grad_x
+with open("beta_dist_logp.txt", "w") as f:
+    f.write(" ".join(map(str, logp)))
 
-dlogp = torch.ones(256, dtype=torch.float32, requires_grad=True)
-grad_x = torch.autograd.grad(outputs=entropy, inputs=(alpha, beta), grad_outputs=dlogp)
-grad_alpha, grad_beta = grad_x
+with open("beta_dist_entropy.txt", "w") as f:
+    f.write(" ".join(map(str, entropy)))
 
-print(grad_alpha.shape)
-print(grad_beta.shape)
+dlogp = torch.arange(B, dtype=torch.float32, requires_grad=True) + 1
+dh = torch.arange(B, dtype=torch.float32, requires_grad=True) + 1
+action = (torch.arange(total, dtype=torch.float32, requires_grad=True).reshape(B, dim) + 1) / (total + 2)
+logp = dist.log_prob(action).sum(-1)
+entropy = dist.entropy().sum(-1)
 
-print(np.sum(list(grad_alpha.detach().numpy().flatten())))
-print(np.sum(list(grad_beta.detach().numpy().flatten())))
-print(list(grad_alpha.detach().numpy().flatten())[:32])
-#print(list(grad_beta.detach().numpy().flatten()))
+grad_x = torch.autograd.grad(outputs=logp, inputs=(alpha, beta), grad_outputs=dlogp)
+da_logp, db_logp = grad_x
 
-"""
-# Option B – functional style, returns the grads directly
-grads = torch.autograd.grad(logp, (alpha, beta), grad_outputs=dy)
-grad_alpha, grad_beta = grads        # each (256, 4)
+grad_x = torch.autograd.grad(outputs=entropy, inputs=(alpha, beta), grad_outputs=dh)
+da_h, db_h = grad_x
 
-# ---- gradients of log-probability ----
-logp.backward(retain_graph=True)   # keep graph because we'll run another .backward()
-grad_alpha_logp = alpha.grad.clone()
-grad_beta_logp  = beta.grad.clone()
+da_logp = list(da_logp.detach().numpy().flatten())
+db_logp = list(db_logp.detach().numpy().flatten())
+da_h = list(da_h.detach().numpy().flatten())
+db_h = list(db_h.detach().numpy().flatten())
+with open("beta_dist_da_logp.txt", "w") as f:
+    f.write(" ".join(map(str, da_logp)))
 
-alpha.grad.zero_(); beta.grad.zero_()          # clear before next call
+with open("beta_dist_db_logp.txt", "w") as f:
+    f.write(" ".join(map(str, db_logp)))
 
-# ---- gradients of entropy ----
-entropy.backward()
-grad_alpha_entropy = alpha.grad
-grad_beta_entropy  = beta.grad
-"""
-print()
+with open("beta_dist_da_h.txt", "w") as f:
+    f.write(" ".join(map(str, da_h)))
 
-import torch
-import torch.special  # For digamma and loggamma functions
-def beta_entropy(alpha, beta):
-    # Ensure alpha and beta are float tensors with gradients enabled
-    logB = torch.lgamma(alpha) + torch.lgamma(beta) - torch.lgamma(alpha + beta)
-    term1 = (alpha - 1) * torch.special.digamma(alpha)
-    term2 = (beta - 1) * torch.special.digamma(beta)
-    term3 = (alpha + beta - 2) * torch.special.digamma(alpha + beta)
-    entropy = logB - term1 - term2 + term3
-    return entropy
-
-# Example parameters (requires_grad=True to track gradients)
-alpha = torch.tensor(2.0, requires_grad=True)
-beta = torch.tensor(3.0, requires_grad=True)
-
-# Compute entropy
-H = beta_entropy(alpha, beta)
-
-# Compute gradients
-H.backward()
-
-# Get gradients
-dH_dalpha = alpha.grad
-dH_dbeta = beta.grad
-
-print(f'dH/dalpha: {dH_dalpha.item()}')
-print(f'dH/dbeta: {dH_dbeta.item()}')
+with open("beta_dist_db_h.txt", "w") as f:
+    f.write(" ".join(map(str, db_h)))

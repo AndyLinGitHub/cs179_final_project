@@ -1,80 +1,42 @@
-import numpy as np
+import torch
+import torch.nn.functional as F
 
-import numpy as np
+N = 8
+C = 2
+H = 5
+W = 5
+total = N*C*H*W
 
-def conv2d_forward(x, W, b, stride=1, padding=0):
-    N, C_in, H, W_in = x.shape
-    C_out, _, K_h, K_w = W.shape
+in_channel = 2
+out_channel = 4
+k = 3
+stride = 1
+pad = 0
+total_weights = in_channel * out_channel * k * k
 
-    # Padding
-    x_padded = np.pad(x, ((0,0), (0,0), (padding,padding), (padding,padding)), mode='constant')
-    H_padded, W_padded = x_padded.shape[2:]
+x = torch.arange(total, dtype=torch.float32, requires_grad=True).reshape(N, C, H, W)
+weights = torch.arange(total_weights, dtype=torch.float32, requires_grad=True).reshape(out_channel, in_channel, k, k)
+bias = torch.arange(out_channel, dtype=torch.float32, requires_grad=True)
+y = F.conv2d(x, weights, bias, stride, pad)
+out_N, out_C, out_H, out_W = y.shape
+out_total = out_N*out_C*out_H*out_W
 
-    H_out = (H_padded - K_h) // stride + 1
-    W_out = (W_padded - K_w) // stride + 1
-    out = np.zeros((N, C_out, H_out, W_out))
+dy = torch.arange(out_total, dtype=torch.float32, requires_grad=True).reshape(out_N, out_C, out_H, out_W)
+dx, dW, db = torch.autograd.grad(outputs=y, inputs=(x, weights, bias), grad_outputs=dy)
 
-    for n in range(N):
-        for oc in range(C_out):
-            for i in range(H_out):
-                for j in range(W_out):
-                    for ic in range(C_in):
-                        h_start = i * stride
-                        w_start = j * stride
-                        patch = x_padded[n, ic, h_start:h_start+K_h, w_start:w_start+K_w]
-                        out[n, oc, i, j] += np.sum(patch * W[oc, ic])
-            out[n, oc] += b[oc]
+y = list(y.detach().numpy().flatten())
+dx = list(dx.detach().numpy().flatten())
+dW = list(dW.detach().numpy().flatten())
+db = list(db.detach().numpy().flatten())
 
-    return out, x_padded  # Save padded input for backward
+with open("conv_y.txt", "w") as f:
+    f.write(" ".join(map(str, y)))
 
-def conv2d_backward(dout, x_padded, W, stride=1, padding=0):
-    N, C_in, H_padded, W_padded = x_padded.shape
-    C_out, _, K_h, K_w = W.shape
-    _, _, H_out, W_out = dout.shape
+with open("conv_dx.txt", "w") as f:
+    f.write(" ".join(map(str, dx)))
 
-    dx_padded = np.zeros_like(x_padded)
-    dW = np.zeros_like(W)
-    db = np.zeros(C_out)
+with open("conv_dW.txt", "w") as f:
+    f.write(" ".join(map(str, dW)))
 
-    for n in range(N):
-        for oc in range(C_out):
-            db[oc] += np.sum(dout[n, oc])
-            for i in range(H_out):
-                for j in range(W_out):
-                    h_start = i * stride
-                    w_start = j * stride
-                    for ic in range(C_in):
-                        patch = x_padded[n, ic, h_start:h_start+K_h, w_start:w_start+K_w]
-                        dW[oc, ic] += patch * dout[n, oc, i, j]
-                        dx_padded[n, ic, h_start:h_start+K_h, w_start:w_start+K_w] += W[oc, ic] * dout[n, oc, i, j]
-
-    # Remove padding from dx
-    if padding > 0:
-        dx = dx_padded[:, :, padding:-padding, padding:-padding]
-    else:
-        dx = dx_padded
-
-    return dW, db, dx
-
-
-inputs = np.arange(0, 100).reshape(2, 2, 5, 5).astype(float)
-kernels = np.arange(0, 72).reshape(4, 2, 3, 3).astype(float)
-bias = np.arange(0, 4).astype(float)
-
-output, x_padded = conv2d_forward(inputs, kernels, bias, stride=1, padding=0)
-
-dout = np.ones_like(output).astype(float)
-dW, db, dx = conv2d_backward(dout, x_padded, kernels, stride=1, padding=0)
-
-print("Output")
-print(output.shape)
-print(list(output.flatten()))
-
-print("dW")
-print(list(dW.flatten()))
-
-print("db")
-print(list(db.flatten()))
-
-print("dx")
-print(list(dx.flatten()))
+with open("conv_db.txt", "w") as f:
+    f.write(" ".join(map(str, db)))

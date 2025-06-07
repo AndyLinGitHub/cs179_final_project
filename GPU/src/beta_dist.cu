@@ -1,50 +1,150 @@
 #include "beta_dist.h"
-#include "beta_dist_kernel.cuh"
 
-BetaPolicyOp::BetaPolicyOp(int batch, int dim)
-    : B_(batch), D_(dim)
-{
+__device__ inline float digammaf(float x) {
+    float r = 0.f;
+    while (x < 5.f) { r -= 1.f / x; x += 1.f; }
+
+    float f = 1.f / (x * x);
+    r += logf(x) - .5f/x - f*(1.f/12.f - f*(1.f/120.f - f/252.f));
+    
+    return r;
 }
 
-void BetaPolicyOp::forward( Tensor* d_alpha,  Tensor* d_beta)
-{
-    alpha_cache = d_alpha;
-    beta_cache = d_beta;
+__device__ inline float trigammaf(float x) {
+    float acc = 0.0;
 
-    if (!d_action_) d_action_ = new Tensor(B_, D_, 1, 1);
-    if (!d_logp_) d_logp_ = new Tensor(B_, 1, 1, 1);
-    if (!d_entropy_) d_entropy_ = new Tensor(B_, 1, 1, 1);
+    while (x < 5.0) {
+        acc += 1.0 / (x * x);
+        x   += 1.0;
+    }
 
-    int threads = 256, blocks = (B_ + threads - 1) / threads;
-    beta4_forward_kernel<<<blocks, threads>>>(
-        d_alpha->data, d_beta->data,
-        d_action_->data, d_logp_->data, d_entropy_->data,
-        42, B_);
+    float invx = 1.0 / x;
+    float invx2 = invx * invx;
+    float series = invx + invx2 * (0.5 + invx  * (1.0/6.0 - invx2 * (1.0/30.0)));
+
+    return acc + series;
 }
 
-void BetaPolicyOp::backward( Tensor* d_dLogp,  Tensor* d_dEnt)
+__device__ float gamma_rsample(curandStatePhilox4_32_10_t& state, float k)
 {
-    if (!d_dAlpha_logp) d_dAlpha_logp = new Tensor(B_, D_, 1, 1);
-    if (!d_dBeta_logp) d_dBeta_logp = new Tensor(B_, D_, 1, 1);
-    if (!d_dAlpha_h) d_dAlpha_h = new Tensor(B_, D_, 1, 1);
-    if (!d_dBeta_h) d_dBeta_h = new Tensor(B_, D_, 1, 1);
+    const float d = k - 1.f/3.f;
+    const float c = 1.f / sqrtf(9.f*d);
 
-    int threads = 256, blocks = (B_ + threads - 1) / threads;
-    beta4_backward_kernel<<<blocks, threads>>>(
-        alpha_cache->data, beta_cache->data,
-        d_action_->data, d_dLogp->data, d_dEnt->data,
-        d_dAlpha_logp->data, d_dBeta_logp->data,
-        d_dAlpha_h->data, d_dBeta_h->data,
-        B_);
+    while (true) {
+        float x = curand_normal(&state);
+        float v = 1.f + c*x;
+        if (v <= 0.f) continue;
+        
+        v = v*v*v;
+        float u = curand_uniform(&state);
+        if (u < 1.f - .0331f * x * x * x * x) return d * v;
+        if (logf(u) < .5f * x * x + d * (1.f - v + logf(v))) return d * v;
+    }
 }
 
-BetaPolicyOp::~BetaPolicyOp()
-{
-    if (d_action_) delete d_action_;
-    if (d_logp_) delete d_logp_;
-    if (d_entropy_) delete d_entropy_;
-    if (d_dAlpha_logp) delete d_dAlpha_logp;
-    if (d_dBeta_logp) delete d_dBeta_logp;
-    if (d_dAlpha_h) delete d_dAlpha_h;
-    if (d_dBeta_h) delete d_dBeta_h;
+__global__ void beta_dist_forward_kernel(const float *alpha, const float *beta, float *action, 
+                                         float *logp_sum, float *h_sum, int B, int dim) {
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    if (idx >= B) return;
+
+    curandStatePhilox4_32_10_t rng;
+    curand_init(clock64(), idx, 0, &rng);
+
+    float logp = 0.f, h = 0.f;
+
+    #pragma unroll
+    for (int i = 0; i < dim; ++i) {
+        float a = alpha[dim*idx + i];
+        float b = beta[dim*idx + i];
+
+        float g1 = gamma_rsample(rng, a);
+        float g2 = gamma_rsample(rng, b);
+        float x  = g1 / (g1 + g2);
+        action[dim*idx + i] = x;
+
+        float lnB = lgammaf(a) + lgammaf(b) - lgammaf(a + b);
+        logp += (a - 1.f) * logf(x) + (b - 1.f) * logf(1.f - x) - lnB;
+        h += lnB - (a - 1.f) * digammaf(a) - (b - 1.f) * digammaf(b) + (a + b - 2.f) * digammaf(a + b);
+    }
+
+    logp_sum[idx] = logp;
+    h_sum[idx] = h;
 }
+
+__global__ void beta_dist_backward_kernel(const float *alpha, const float *beta, const float *action,
+                                          const float *dlogp, const float *dh,
+                                          float *da_logp, float *db_logp, float *da_h, float *db_h,
+                                          int B, int dim) {
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    if (idx >= B) return;
+
+    float dlogp_ = dlogp[idx];
+    float dh_ = dh[idx];
+
+    #pragma unroll
+    for (int i = 0; i < dim; ++i) {
+        float a = alpha[dim*idx + i];
+        float b = beta [dim*idx + i];
+        float x = action[dim*idx + i];
+
+        float psi_ab = digammaf(a + b);
+        float dlogp_da = logf(x) - digammaf(a) + psi_ab;
+        float dlogp_db = logf(1.f - x) - digammaf(b) + psi_ab;
+
+        float trig_ab = trigammaf(a + b);
+        float dh_da  = -(a - 1.f) * trigammaf(a) + (a + b - 2.f) * trig_ab;
+        float dh_db  = -(b - 1.f) * trigammaf(b) + (a + b - 2.f) * trig_ab;
+
+        da_logp[dim*idx + i] = dlogp_ * dlogp_da;
+        db_logp[dim*idx + i] = dlogp_ * dlogp_db;
+        da_h[dim*idx + i] = dh_ * dh_da;
+        db_h[dim*idx + i] = dh_ * dh_db;
+    }
+}
+
+BetaDist:: BetaDist() {
+}
+
+BetaDist:: ~BetaDist() {
+    if (action_) delete action_;
+    if (logp_) delete logp_;
+    if (entropy_) delete entropy_;
+    if (da_logp_) delete da_logp_;
+    if (db_logp_) delete db_logp_;
+    if (da_h_) delete da_h_;
+    if (db_h_) delete db_h_;
+}
+
+void BetaDist:: forward(Tensor* alpha,  Tensor* beta, cudaStream_t stream) {
+    alpha_cache = alpha;
+    beta_cache = beta;
+
+    const int B = alpha->n();
+    const int dim = alpha->c();
+
+    if (!action_) action_ = new Tensor(B, dim, 1, 1);
+    if (!logp_) logp_ = new Tensor(B, 1, 1, 1); // Sum of last dimension
+    if (!entropy_) entropy_ = new Tensor(B, 1, 1, 1); // Sum of last dimension
+
+    const int blocks  = (B + THREAD_PER_BLOCK - 1) / THREAD_PER_BLOCK;    
+    beta_dist_forward_kernel<<<blocks, THREAD_PER_BLOCK, 0, stream>>>(alpha->data, beta->data, action_->data, 
+                                                                logp_->data, entropy_->data, B, dim);
+}
+
+void BetaDist:: backward(Tensor* dlogp,  Tensor* dh, cudaStream_t stream) {
+    const int B = alpha_cache->n();
+    const int dim = alpha_cache->c();
+
+    if (!da_logp_) da_logp_ = new Tensor(B, dim, 1, 1);
+    if (!db_logp_) db_logp_ = new Tensor(B, dim, 1, 1);
+    if (!da_h_) da_h_ = new Tensor(B, dim, 1, 1);
+    if (!db_h_) db_h_ = new Tensor(B, dim, 1, 1);
+
+    const int blocks  = (B + THREAD_PER_BLOCK - 1) / THREAD_PER_BLOCK;
+    beta_dist_backward_kernel<<<blocks, THREAD_PER_BLOCK, 0, stream>>>(alpha_cache->data, beta_cache->data, action_->data,
+                                                                 dlogp->data, dh->data, 
+                                                                 da_logp_->data, db_logp_->data, da_h_->data, db_h_->data,
+                                                                 B, dim);
+}
+
+

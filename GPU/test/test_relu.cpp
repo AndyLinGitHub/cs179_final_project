@@ -1,9 +1,9 @@
- #include "relu.h"
  #include <cassert>
  #include <cmath>
  #include <iostream>
  #include <vector>
- 
+ #include "relu.h"
+
  int main() {
     cudaStream_t stream;
     cudaStreamCreate(&stream);
@@ -19,10 +19,10 @@
     for (int i = 0; i < total; ++i) host_x[i] = static_cast<float>(i - 50);
     CUDA_CALL(cudaMemcpy(x.data, host_x.data(), host_x.size()*sizeof(float), cudaMemcpyHostToDevice));
  
-    Relu relu = Relu(stream);
+    Relu relu = Relu();
 
     // Forward
-    Tensor* y = relu.forward(&x, cudnn);
+    Tensor* y = relu.forward(&x, cudnn, stream);
     std::vector<float> host_y(host_x.size());
     CUDA_CALL(cudaMemcpy(host_y.data(), y->data, host_y.size()*sizeof(float), cudaMemcpyDeviceToHost));
  
@@ -38,7 +38,7 @@
     for (int i = 0; i < total; ++i) host_dy[i] = static_cast<float>(i - 50);
     CUDA_CALL(cudaMemcpy(dy.data, host_dy.data(), host_dy.size()*sizeof(float),cudaMemcpyHostToDevice));
  
-    Tensor* dx = relu.backward(&dy, cudnn);
+    Tensor* dx = relu.backward(&dy, cudnn, stream);
     std::vector<float> host_dx(host_x.size());
     CUDA_CALL(cudaMemcpy(host_dx.data(), dx->data, host_dx.size()*sizeof(float), cudaMemcpyDeviceToHost));
  
@@ -48,11 +48,11 @@
         assert(std::fabs(host_dx[i] - expected_dx) == 0);
     }
  
-     std::cout << "Relu forward/backward tests passed!" << std::endl;
+    std::cout << "Relu forward/backward tests passed!" << std::endl;
  
-     cudaStreamDestroy(stream);
-     cudnnDestroy(cudnn);
+    cudaStreamDestroy(stream);
+    cudnnDestroy(cudnn);
 
-     return 0;
- }
+    return 0;
+}
  

@@ -1,15 +1,10 @@
- #include "softplus_add1.h"
- #include <cassert>
- #include <cmath>
- #include <iostream>
- #include <vector>
-
  #include <cassert>
  #include <cmath>
  #include <iostream>
  #include <fstream>
  #include <vector>
- 
+ #include "softplus_add1.h"
+
  int main() {
     std::ifstream expected_y_file("softplus_add1_y.txt");
     std::ifstream expected_dx_file("softplus_add1_dx.txt");
@@ -32,10 +27,10 @@
     for (int i = 0; i < total; ++i) host_x[i] = static_cast<float>(i);
     CUDA_CALL(cudaMemcpy(x.data, host_x.data(), host_x.size()*sizeof(float), cudaMemcpyHostToDevice));
  
-    SoftPlusAdd1 spa1(stream); 
+    SoftPlusAdd1 spa1 = SoftPlusAdd1(); 
 
     // Forward
-    Tensor* y = spa1.forward(&x);
+    Tensor* y = spa1.forward(&x, stream);
  
     std::vector<float> host_y(host_x.size());
     CUDA_CALL(cudaMemcpy(host_y.data(), y->data, host_y.size()*sizeof(float), cudaMemcpyDeviceToHost));
@@ -50,7 +45,7 @@
 
     CUDA_CALL(cudaMemcpy(dy.data, host_dy.data(), host_dy.size()*sizeof(float),cudaMemcpyHostToDevice));
  
-    Tensor* dx = spa1.backward(&dy);
+    Tensor* dx = spa1.backward(&dy, stream);
     std::vector<float> host_dx(host_x.size());
     CUDA_CALL(cudaMemcpy(host_dx.data(), dx->data, host_dx.size()*sizeof(float), cudaMemcpyDeviceToHost));
 

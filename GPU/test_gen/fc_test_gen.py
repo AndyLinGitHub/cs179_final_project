@@ -1,32 +1,31 @@
-import numpy as np
+import torch
+import torch.nn.functional as F
 
-X = np.arange(0, 16).reshape(2, 8).astype(float)
-W = np.arange(0, 128).reshape(16, 8).astype(float)
-b = np.arange(0, 16).reshape(16).astype(float)
+N = 2
+in_features = 8
+out_features = 16
 
-#print(W)
+x = torch.arange(N * in_features, dtype=torch.float32, requires_grad=True).reshape(N, in_features)
+weights = torch.arange(out_features * in_features, dtype=torch.float32, requires_grad=True).reshape(out_features, in_features)
+bias = torch.arange(out_features, dtype=torch.float32, requires_grad=True)
+y = F.linear(x, weights, bias)
 
-# Forward pass
-def forward_fc(X, W, b):
-    return X @ W.T + b
+dy = torch.arange(N * out_features, dtype=torch.float32, requires_grad=True).reshape(N, out_features)
+dx, dW, db = torch.autograd.grad(outputs=y, inputs=(x, weights, bias), grad_outputs=dy)
 
-# Backward pass
-def backward_fc(X, W, b, d_out):
-    dx = d_out @ W      # (N, D_in)
-    dW = d_out.T @ X    # (D_out, D_in)
-    db = d_out.sum(axis=0)  # (D_out,)
-    
-    return dx, dW, db
+y = list(y.detach().numpy().flatten())
+dx = list(dx.detach().numpy().flatten())
+dW = list(dW.detach().numpy().flatten())
+db = list(db.detach().numpy().flatten())
 
-# Example usage
-out = forward_fc(X, W, b)
-#print(out.shape)
-print(list(out.flatten()))
+with open("fc_y.txt", "w") as f:
+    f.write(" ".join(map(str, y)))
 
-# Simulate gradient from next layer
-d_out = np.ones((2, 16))
-dX, dW, db = backward_fc(X, W, b, d_out)
-print(list(dX.flatten()))
-print(list(dW.flatten()))
-print(list(db.flatten()))
+with open("fc_dx.txt", "w") as f:
+    f.write(" ".join(map(str, dx)))
 
+with open("fc_dW.txt", "w") as f:
+    f.write(" ".join(map(str, dW)))
+
+with open("fc_db.txt", "w") as f:
+    f.write(" ".join(map(str, db)))

@@ -1,32 +1,34 @@
+#include <math_constants.h>
 #include "tensor.h"
+#include "config.h"
 
-class BetaPolicyOp {
+
+class BetaDist {
 public:
-    BetaPolicyOp(int batch, int dim = 4);
+    BetaDist();
+    ~BetaDist();
 
-    void forward ( Tensor* d_alpha,  Tensor* d_beta);
-    void backward( Tensor* d_dLogp,  Tensor* d_dEnt);
+    void forward (Tensor* alpha,  Tensor* beta, cudaStream_t stream);
+    void backward(Tensor* dlogp,  Tensor* dh, cudaStream_t stream);
 
-    Tensor* action()  { return d_action_; }
-    Tensor* logp()  { return d_logp_; }
-    Tensor* entropy()  { return d_entropy_; }
-    Tensor* gradAlpha_logp()  { return d_dAlpha_logp; }
-    Tensor* gradBeta_logp()  { return d_dBeta_logp; }
-    Tensor* gradAlpha_h()  { return d_dAlpha_h; }
-    Tensor* gradBeta_h()  { return d_dBeta_h; }
+    Tensor* action() { return action_; }
+    Tensor* logp() { return logp_; }
+    Tensor* entropy() { return entropy_; }
+    Tensor* da_logp() { return da_logp_; }
+    Tensor* db_logp() { return db_logp_; }
+    Tensor* da_h() { return da_h_; }
+    Tensor* db_h() { return db_h_; }
 
-    ~BetaPolicyOp();
+    
 
 private:
-    int B_, D_;
-
-    Tensor *d_action_  = nullptr;
-    Tensor *d_logp_ = nullptr;
-    Tensor *d_entropy_ = nullptr;
-    Tensor *d_dAlpha_logp = nullptr;
-    Tensor *d_dBeta_logp = nullptr;
-    Tensor *d_dAlpha_h = nullptr;
-    Tensor *d_dBeta_h = nullptr;
+    Tensor *action_  = nullptr;
+    Tensor *logp_ = nullptr;
+    Tensor *entropy_ = nullptr;
+    Tensor *da_logp_ = nullptr;
+    Tensor *db_logp_ = nullptr;
+    Tensor *da_h_ = nullptr;
+    Tensor *db_h_ = nullptr;
 
     Tensor *alpha_cache = nullptr;
     Tensor *beta_cache = nullptr;

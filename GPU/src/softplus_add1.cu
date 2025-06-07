@@ -39,7 +39,7 @@ __global__ void softplus_add1_backward_kernel(const float *x, const float *dy, f
     if (i < n) dx[i] = dy[i] * sigmoid(x[i]);
 }
 
-SoftPlusAdd1::SoftPlusAdd1(cudaStream_t stream) : stream_(stream) {  
+SoftPlusAdd1::SoftPlusAdd1() {  
 }
 
 SoftPlusAdd1::~SoftPlusAdd1() {
@@ -50,25 +50,25 @@ SoftPlusAdd1::~SoftPlusAdd1() {
     if (y) delete y;
 }
 
-Tensor* SoftPlusAdd1:: forward(Tensor* x) {
+Tensor* SoftPlusAdd1:: forward(Tensor* x, cudaStream_t stream) {
     x_cache = x;
     if (!y) y = new Tensor(x->n(), x->c(), x->h(), x->w());
 
     const int N = x->n()*x->c()*x->h()*x->w();
     const int blocks  = (N + THREAD_NUM - 1) / THREAD_NUM;
 
-    softplus_add1_forward_kernel<<<blocks, THREAD_NUM, 0, stream_>>>(x->data, y->data, N);
+    softplus_add1_forward_kernel<<<blocks, THREAD_NUM, 0, stream >>>(x->data, y->data, N);
 
     return y;
 }
 
-Tensor* SoftPlusAdd1:: backward(Tensor* dy) {
+Tensor* SoftPlusAdd1:: backward(Tensor* dy, cudaStream_t stream) {
     if (!dx) dx = new Tensor(x_cache->n(), x_cache->c(), x_cache->h(), x_cache->w());
 
     const int N = x_cache->n()*x_cache->c()*x_cache->h()*x_cache->w();
     const int blocks  = (N + THREAD_NUM - 1) / THREAD_NUM;
 
-    softplus_add1_backward_kernel<<<blocks, THREAD_NUM, 0, stream_>>>(x_cache->data, dy->data, dx->data, N);
+    softplus_add1_backward_kernel<<<blocks, THREAD_NUM, 0, stream>>>(x_cache->data, dy->data, dx->data, N);
 
     return dx;
 }
