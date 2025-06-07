@@ -18,7 +18,21 @@ void add3(const float *a, const float *b, const float *c,
         out[i] = a[i] + b[i] + c[i];
 }
 
-Policy:: Policy() {
+__global__ void adam_update_kernel(float* p, float* g, float* m, float* v, size_t n, float lr, float beta1, float beta2, float eps, int t) {
+    size_t i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i < n) {
+        float gi = g[i];
+        float mi = m[i] = beta1 * m[i] + (1 - beta1) * gi;
+        float vi = v[i] = beta2 * v[i] + (1 - beta2) * gi * gi;
+        float m_hat = mi / (1 - powf(beta1, t));
+        float v_hat = vi / (1 - powf(beta2, t));
+        p[i] -= lr * m_hat / (sqrtf(v_hat) + eps);
+        g[i] = 0.0f; // clear grad after update
+    }
+}
+
+Policy:: Policy(float lr, float beta1, float beta2, float eps) : lr_(lr), beta1_(beta1), beta2_(beta2), eps_(eps) {
+
 }
 
 Policy:: ~Policy() {
@@ -65,4 +79,72 @@ Tensor* Policy:: backward(Tensor* dlogp, Tensor* dh, Tensor* dv, cudnnHandle_t c
     dx_1 = conv_1.backward(dx_1, cudnn_handle, stream);
 
     return dx_1;
+}
+
+void Policy:: step(cudaStream_t stream) {
+    ++t;
+    int blocks = 0;
+    size_t n = 0;
+
+    param = conv_1.params()[0];
+    n = param->numel;
+    blocks = (n + THREAD_NUM - 1) / THREAD_NUM;
+    adam_update_kernel<<<blocks, THREAD_NUM, 0, stream>>>(param->value, param->grad, param->m, param->v, n, lr_, beta1_, beta2_, eps_, t);
+
+    param = conv_1.params()[1];
+    n = param->numel;
+    blocks = (n + THREAD_NUM - 1) / THREAD_NUM;
+    adam_update_kernel<<<blocks, THREAD_NUM, 0, stream>>>(param->value, param->grad, param->m, param->v, n, lr_, beta1_, beta2_, eps_, t);
+
+    param = conv_2.params()[0];
+    n = param->numel;
+    blocks = (n + THREAD_NUM - 1) / THREAD_NUM;
+    adam_update_kernel<<<blocks, THREAD_NUM, 0, stream>>>(param->value, param->grad, param->m, param->v, n, lr_, beta1_, beta2_, eps_, t);
+
+    param = conv_2.params()[1];
+    n = param->numel;
+    blocks = (n + THREAD_NUM - 1) / THREAD_NUM;
+    adam_update_kernel<<<blocks, THREAD_NUM, 0, stream>>>(param->value, param->grad, param->m, param->v, n, lr_, beta1_, beta2_, eps_, t);
+
+    param = fc_1.params()[0];
+    n = param->numel;
+    blocks = (n + THREAD_NUM - 1) / THREAD_NUM;
+    adam_update_kernel<<<blocks, THREAD_NUM, 0, stream>>>(param->value, param->grad, param->m, param->v, n, lr_, beta1_, beta2_, eps_, t);
+    
+    param = fc_1.params()[1];
+    n = param->numel;
+    blocks = (n + THREAD_NUM - 1) / THREAD_NUM;
+    adam_update_kernel<<<blocks, THREAD_NUM, 0, stream>>>(param->value, param->grad, param->m, param->v, n, lr_, beta1_, beta2_, eps_, t);
+
+    param = fc_2.params()[0];
+    n = param->numel;
+    blocks = (n + THREAD_NUM - 1) / THREAD_NUM;
+    adam_update_kernel<<<blocks, THREAD_NUM, 0, stream>>>(param->value, param->grad, param->m, param->v, n, lr_, beta1_, beta2_, eps_, t);
+    
+    param = fc_2.params()[1];
+    n = param->numel;
+    blocks = (n + THREAD_NUM - 1) / THREAD_NUM;
+    adam_update_kernel<<<blocks, THREAD_NUM, 0, stream>>>(param->value, param->grad, param->m, param->v, n, lr_, beta1_, beta2_, eps_, t);
+
+    param = fc_3.params()[0];
+    n = param->numel;
+    blocks = (n + THREAD_NUM - 1) / THREAD_NUM;
+    adam_update_kernel<<<blocks, THREAD_NUM, 0, stream>>>(param->value, param->grad, param->m, param->v, n, lr_, beta1_, beta2_, eps_, t);
+    
+    param = fc_3.params()[1];
+    n = param->numel;
+    blocks = (n + THREAD_NUM - 1) / THREAD_NUM;
+    adam_update_kernel<<<blocks, THREAD_NUM, 0, stream>>>(param->value, param->grad, param->m, param->v, n, lr_, beta1_, beta2_, eps_, t);
+
+    param = fc_4.params()[0];
+    n = param->numel;
+    blocks = (n + THREAD_NUM - 1) / THREAD_NUM;
+    adam_update_kernel<<<blocks, THREAD_NUM, 0, stream>>>(param->value, param->grad, param->m, param->v, n, lr_, beta1_, beta2_, eps_, t);
+    
+    param = fc_4.params()[1];
+    n = param->numel;
+    blocks = (n + THREAD_NUM - 1) / THREAD_NUM;
+    adam_update_kernel<<<blocks, THREAD_NUM, 0, stream>>>(param->value, param->grad, param->m, param->v, n, lr_, beta1_, beta2_, eps_, t);
+
+    CUDA_CALL(cudaGetLastError());
 }

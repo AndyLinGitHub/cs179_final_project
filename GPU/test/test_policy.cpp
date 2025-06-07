@@ -69,7 +69,7 @@ int main(){
         assert(std::fabs(host_beta[i] - expected_beta[i]) < 1e-4f);
     }
     
-    // // Backward
+    // Backward
     Tensor dlogp(N, 1, 1, 1);
     Tensor dh(N, 1, 1, 1);
     std::vector<float> host_dlogp(N);
@@ -91,6 +91,9 @@ int main(){
     float true_mean_dx = std::accumulate(expected_dx.begin(), expected_dx.end(), 0.0) / expected_dx.size();
     std:: cout << "Output: " << mean_dx << " Expected: " << true_mean_dx << std:: endl;
     std:: cout << "Policy forward/backward tests passed!" << std::endl;
+
+    // Step
+    policy.step(stream);
 
     cudaStreamDestroy(stream);
     cudnnDestroy(cudnn);

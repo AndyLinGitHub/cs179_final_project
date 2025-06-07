@@ -8,16 +8,21 @@
 
 class Policy {
 public:
-    Policy();
+    Policy(float lr = 1e-3, float beta1 = 0.9f, float beta2 = 0.999f, float eps = 1e-8f);
     ~Policy();
 
     Tensor* forward(Tensor* x, cudnnHandle_t cudnn_handle, cublasHandle_t cublas_handle, cudaStream_t stream);
     Tensor* backward(Tensor* dlogp,  Tensor* dh, Tensor* dv, cudnnHandle_t cudnn_handle, cublasHandle_t cublas_handle, cudaStream_t stream);
+    void step(cudaStream_t stream);
 
     Tensor* alpha() { return alpha_; }
     Tensor* beta() { return beta_; }
 
 private:
+    float lr_, beta1_, beta2_, eps_;
+    int t = 0;
+    Parameter* param;
+    
     Conv conv_1 = Conv(ACTION_DIM, CONV_CHANNEL, CONV_KERNEL, CONV_STRIDE, CONV_PAD);
     Conv conv_2 = Conv(CONV_CHANNEL, CONV_CHANNEL*2, CONV_KERNEL, CONV_STRIDE, CONV_PAD);
     Relu relu_1 = Relu();
