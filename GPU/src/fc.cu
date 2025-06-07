@@ -53,7 +53,7 @@ Tensor* FC:: forward(Tensor* x, cublasHandle_t handle, cudaStream_t stream) {
     return y;
 }
 
-Tensor* FC:: backward(Tensor* dy, cublasHandle_t handle, cudaStream_t stream) {
+Tensor* FC:: backward(Tensor* dy, cublasHandle_t handle, cudaStream_t stream, bool flatten) {
     CUBLAS_CALL(cublasSetStream(handle, stream));
 
     int N = dy->n();
@@ -63,7 +63,9 @@ Tensor* FC:: backward(Tensor* dy, cublasHandle_t handle, cudaStream_t stream) {
     const float alpha = 1.0f, beta = 0.0f;
 
     // dx
-    if (!dx) dx = new Tensor(x_cache->n(), x_cache->c(), 1, 1);
+    if (!flatten) {if (!dx) dx = new Tensor(x_cache->n(), in_feature_, 1, 1);}
+    else {if (!dx) dx = new Tensor(x_cache->n(), x_cache->c(), x_cache->h(), x_cache->w());}
+
     CUBLAS_CALL(cublasSgemm(handle, CUBLAS_OP_N, CUBLAS_OP_N, K, N, M, &alpha, W.value, K, dy->data, M, &beta, dx->data, K));
 
     // dW

@@ -8,7 +8,7 @@ public:
     ~FC();
 
     Tensor* forward (Tensor* x, cublasHandle_t handle, cudaStream_t stream);
-    Tensor* backward(Tensor* dy, cublasHandle_t handle, cudaStream_t stream);
+    Tensor* backward(Tensor* dy, cublasHandle_t handle, cudaStream_t stream, bool flatten = false);
     std::vector<Parameter*> params() { return { &W, &b }; }
 
 private:

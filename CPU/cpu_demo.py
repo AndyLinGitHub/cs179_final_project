@@ -24,8 +24,8 @@ class ConvBetaActorCritic(nn.Module):
         super().__init__()
         
         self.cnn = nn.Sequential(
-            nn.Conv2d(act_dim, 32, 3, stride=1), nn.ReLU(),
-            nn.Conv2d(32, 64, 3, stride=1), nn.ReLU(),
+            nn.Conv2d(act_dim, 32, 3, stride=1, padding=1), nn.ReLU(),
+            nn.Conv2d(32, 64, 3, stride=1, padding=1), nn.ReLU(),
             nn.Flatten()
         )
         

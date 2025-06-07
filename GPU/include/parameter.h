@@ -1,7 +1,10 @@
-#include <cstddef>
+#pragma once
 
+#include <cstddef>
+#include <vector>
 #include <cuda_runtime.h>
 #include "helper_cuda.h"
+#include "config.h"
 
 struct Parameter {
     float* value; // device memory
