@@ -35,7 +35,7 @@ class ConvBetaActorCritic(nn.Module):
 
 N = 1024
 C = 4
-K = 8
+K = 7
 model = ConvBetaActorCritic(K, C)
 
 # Set all weights and biases to 0.01

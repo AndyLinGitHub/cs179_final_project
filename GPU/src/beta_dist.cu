@@ -1,4 +1,5 @@
 #include "beta_dist.h"
+#include <cassert>
 
 __device__ inline float digammaf(float x) {
     float r = 0.f;
@@ -71,23 +72,21 @@ __global__ void beta_dist_forward_kernel(const float *alpha, const float *beta, 
     h_sum[idx] = h;
 }
 
-// __global__ void beta_dist_backward_kernel(const float *alpha, const float *beta, const float *action,
-//                                           const float *dlogp, const float *dh,
-//                                           float *da_logp, float *db_logp, float *da_h, float *db_h,
-//                                           int B, int dim) {
-__global__ void beta_dist_backward_kernel(const float *alpha, const float *beta, const float *action,
-    const float *dlogp, const float *dh, float *da, float *db, int B, int dim) {
+__global__ void beta_dist_backward_kernel(const float *alpha, const float *beta, const float *action, 
+                                          const float *e, float *da, float *db, int B, int dim) {
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
     if (idx >= B) return;
 
-    float dlogp_ = dlogp[idx];
-    float dh_ = dh[idx];
+    float e_ = e[idx];
 
     #pragma unroll
     for (int i = 0; i < dim; ++i) {
         float a = alpha[dim*idx + i];
         float b = beta [dim*idx + i];
         float x = action[dim*idx + i];
+
+        if (x <= 0.000001f) x = 0.000001f;
+        if (x >= 0.999999f) x = 0.999999f;
 
         float psi_ab = digammaf(a + b);
         float dlogp_da = logf(x) - digammaf(a) + psi_ab;
@@ -97,12 +96,10 @@ __global__ void beta_dist_backward_kernel(const float *alpha, const float *beta,
         float dh_da  = -(a - 1.f) * trigammaf(a) + (a + b - 2.f) * trig_ab;
         float dh_db  = -(b - 1.f) * trigammaf(b) + (a + b - 2.f) * trig_ab;
 
-        // da_logp[dim*idx + i] = dlogp_ * dlogp_da;
-        // db_logp[dim*idx + i] = dlogp_ * dlogp_db;
-        // da_h[dim*idx + i] = dh_ * dh_da;
-        // db_h[dim*idx + i] = dh_ * dh_db;
-        da[dim*idx + i] = dlogp_ * dlogp_da + dh_ * dh_da;
-        db[dim*idx + i] = dlogp_ * dlogp_db + dh_ * dh_db;
+        da[dim*idx + i] = e_*e_*dlogp_da;
+        db[dim*idx + i] = e_*e_*dlogp_db;
+
+        assert(!isnan(dlogp_db));
     }
 }
 
@@ -113,10 +110,6 @@ BetaDist:: ~BetaDist() {
     if (action_) delete action_;
     if (logp_) delete logp_;
     if (entropy_) delete entropy_;
-    // if (da_logp_) delete da_logp_;
-    // if (db_logp_) delete db_logp_;
-    // if (da_h_) delete da_h_;
-    // if (db_h_) delete db_h_;
     if (da_) delete da_;
     if (db_) delete db_;
 }
@@ -137,24 +130,16 @@ void BetaDist:: forward(Tensor* alpha,  Tensor* beta, cudaStream_t stream) {
                                                                 logp_->data, entropy_->data, B, dim);
 }
 
-void BetaDist:: backward(Tensor* dlogp,  Tensor* dh, cudaStream_t stream) {
+void BetaDist:: backward(Tensor* e, cudaStream_t stream) {
     const int B = alpha_cache->n();
     const int dim = alpha_cache->c();
 
-    // if (!da_logp_) da_logp_ = new Tensor(B, dim, 1, 1);
-    // if (!db_logp_) db_logp_ = new Tensor(B, dim, 1, 1);
-    // if (!da_h_) da_h_ = new Tensor(B, dim, 1, 1);
-    // if (!db_h_) db_h_ = new Tensor(B, dim, 1, 1);
     if (!da_) da_ = new Tensor(B, dim, 1, 1);
     if (!db_) db_ = new Tensor(B, dim, 1, 1);
 
     const int blocks  = (B + THREAD_PER_BLOCK - 1) / THREAD_PER_BLOCK;
-    // beta_dist_backward_kernel<<<blocks, THREAD_PER_BLOCK, 0, stream>>>(alpha_cache->data, beta_cache->data, action_->data,
-    //                                                              dlogp->data, dh->data, 
-    //                                                              da_logp_->data, db_logp_->data, da_h_->data, db_h_->data,
-    //                                                              B, dim);
-    beta_dist_backward_kernel<<<blocks, THREAD_PER_BLOCK, 0, stream>>>(alpha_cache->data, beta_cache->data, action_->data,
-                                                                       dlogp->data, dh->data, da_->data, db_->data, B, dim);
+    beta_dist_backward_kernel<<<blocks, THREAD_PER_BLOCK, 0, stream>>>(alpha_cache->data, beta_cache->data, action_->data, 
+                                                                       e->data, da_->data, db_->data, B, dim);
 }
 
 

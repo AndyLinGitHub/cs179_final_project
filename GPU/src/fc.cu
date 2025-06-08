@@ -1,4 +1,5 @@
 #include "fc.h"
+#include <cassert>
 
 __global__ void add_bias_kernel(float* y, const float* b, int M, int num) {
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
@@ -18,6 +19,8 @@ __global__ void reduce_bias_kernel(const float* dy, float* db, int N, int M) {
         sum += dy[row * M + col]; // row-major with stride M
 
     db[col] = sum;
+
+
 }
 
 FC:: FC(int in_feature, int out_feature) 

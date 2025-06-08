@@ -1,5 +1,6 @@
 #include "policy.h"
 #include <iostream>
+#include <cassert>
 
 __global__
 void add2(const float *a, const float *b, float *out, int n)
@@ -7,15 +8,6 @@ void add2(const float *a, const float *b, float *out, int n)
     int i = blockDim.x * blockIdx.x + threadIdx.x;
     if (i < n)
         out[i] = a[i] + b[i];
-}
-
-__global__
-void add3(const float *a, const float *b, const float *c,
-          float *out, int n)
-{
-    int i = blockDim.x * blockIdx.x + threadIdx.x;
-    if (i < n)
-        out[i] = a[i] + b[i] + c[i];
 }
 
 __global__ void adam_update_kernel(float* p, float* g, float* m, float* v, size_t n, float lr, float beta1, float beta2, float eps, int t) {
@@ -32,7 +24,6 @@ __global__ void adam_update_kernel(float* p, float* g, float* m, float* v, size_
 }
 
 Policy:: Policy(float lr, float beta1, float beta2, float eps) : lr_(lr), beta1_(beta1), beta2_(beta2), eps_(eps) {
-
 }
 
 Policy:: ~Policy() {
@@ -41,6 +32,7 @@ Policy:: ~Policy() {
 
 Tensor* Policy:: forward(Tensor* x, cudnnHandle_t cudnn_handle, cublasHandle_t cublas_handle, cudaStream_t stream) {
     temp = conv_1.forward(x, cudnn_handle, stream);
+
     temp = relu_1.forward(temp, cudnn_handle, stream);
     temp = conv_2.forward(temp, cudnn_handle, stream);
     temp = relu_2.forward(temp, cudnn_handle, stream);
@@ -49,27 +41,25 @@ Tensor* Policy:: forward(Tensor* x, cudnnHandle_t cudnn_handle, cublasHandle_t c
 
     alpha_ = fc_2.forward(temp, cublas_handle, stream);
     beta_ = fc_3.forward(temp, cublas_handle, stream);
-    value_ = fc_4.forward(temp, cublas_handle, stream);
 
     alpha_ = spa_1.forward(alpha_, stream);
     beta_ = spa_2.forward(beta_, stream);
     bd.forward(alpha_, beta_, stream);
 
-    return value_;
+    return bd.action();
 }
 
-Tensor* Policy:: backward(Tensor* dlogp, Tensor* dh, Tensor* dv, cudnnHandle_t cudnn_handle, cublasHandle_t cublas_handle, cudaStream_t stream) {
-    bd.backward(dlogp, dh, stream);
+Tensor* Policy:: backward(Tensor* e, cudnnHandle_t cudnn_handle, cublasHandle_t cublas_handle, cudaStream_t stream) {
+    bd.backward(e, stream);
     dx_1 = spa_2.backward(bd.db(), stream);
     dx_2 = spa_1.backward(bd.da(), stream);
-    dx_3 = fc_4.backward(dv, cublas_handle, stream);
     dx_1 = fc_3.backward(dx_1, cublas_handle, stream);
     dx_2 = fc_2.backward(dx_2, cublas_handle, stream);
 
-    if (!dx_sum) dx_sum = new Tensor(dx_3->n(), dx_3->c(), dx_3->h(), dx_3->w());
-    const int total = dx_3->n() * dx_3->c() * dx_3->h() * dx_3->w();
+    if (!dx_sum) dx_sum = new Tensor(dx_2->n(), dx_2->c(), dx_2->h(), dx_2->w());
+    const int total = dx_2->n() * dx_2->c() * dx_2->h() * dx_2->w();
     const int blocks  = (total + THREAD_PER_BLOCK - 1) / THREAD_PER_BLOCK;
-    add3<<<blocks, THREAD_PER_BLOCK, 0, stream>>>(dx_1->data, dx_2->data, dx_3->data, dx_sum->data, total);
+    add2<<<blocks, THREAD_PER_BLOCK, 0, stream>>>(dx_1->data, dx_2->data, dx_sum->data, total);
 
     dx_1 = relu_3.backward(dx_sum, cudnn_handle, stream);
     dx_1 = fc_1.backward(dx_1, cublas_handle, stream, true); //True flag for indicating there is a implicit flatten operation before forwarding to this layer
@@ -132,16 +122,6 @@ void Policy:: step(cudaStream_t stream) {
     adam_update_kernel<<<blocks, THREAD_NUM, 0, stream>>>(param->value, param->grad, param->m, param->v, n, lr_, beta1_, beta2_, eps_, t);
     
     param = fc_3.params()[1];
-    n = param->numel;
-    blocks = (n + THREAD_NUM - 1) / THREAD_NUM;
-    adam_update_kernel<<<blocks, THREAD_NUM, 0, stream>>>(param->value, param->grad, param->m, param->v, n, lr_, beta1_, beta2_, eps_, t);
-
-    param = fc_4.params()[0];
-    n = param->numel;
-    blocks = (n + THREAD_NUM - 1) / THREAD_NUM;
-    adam_update_kernel<<<blocks, THREAD_NUM, 0, stream>>>(param->value, param->grad, param->m, param->v, n, lr_, beta1_, beta2_, eps_, t);
-    
-    param = fc_4.params()[1];
     n = param->numel;
     blocks = (n + THREAD_NUM - 1) / THREAD_NUM;
     adam_update_kernel<<<blocks, THREAD_NUM, 0, stream>>>(param->value, param->grad, param->m, param->v, n, lr_, beta1_, beta2_, eps_, t);

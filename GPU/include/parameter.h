@@ -2,6 +2,8 @@
 
 #include <cstddef>
 #include <vector>
+#include <random>
+#include <algorithm> 
 #include <cuda_runtime.h>
 #include "helper_cuda.h"
 #include "config.h"

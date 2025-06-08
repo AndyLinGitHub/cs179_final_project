@@ -8,15 +8,16 @@
 
 class Policy {
 public:
-    Policy(float lr = 1e-3, float beta1 = 0.9f, float beta2 = 0.999f, float eps = 1e-8f);
+    Policy(float lr = 1e-4, float beta1 = 0.9f, float beta2 = 0.999f, float eps = 1e-8f);
     ~Policy();
 
     Tensor* forward(Tensor* x, cudnnHandle_t cudnn_handle, cublasHandle_t cublas_handle, cudaStream_t stream);
-    Tensor* backward(Tensor* dlogp,  Tensor* dh, Tensor* dv, cudnnHandle_t cudnn_handle, cublasHandle_t cublas_handle, cudaStream_t stream);
+    Tensor* backward(Tensor* e, cudnnHandle_t cudnn_handle, cublasHandle_t cublas_handle, cudaStream_t stream);
     void step(cudaStream_t stream);
 
     Tensor* alpha() { return alpha_; }
     Tensor* beta() { return beta_; }
+    Tensor* action() { return bd.action(); }
 
 private:
     float lr_, beta1_, beta2_, eps_;
@@ -31,7 +32,6 @@ private:
     FC fc_1 = FC(FEATURE_DIM, HIDDEN_DIM);
     FC fc_2 = FC(HIDDEN_DIM, ACTION_DIM);
     FC fc_3 = FC(HIDDEN_DIM, ACTION_DIM);
-    FC fc_4 = FC(HIDDEN_DIM, 1);
     SoftPlusAdd1 spa_1 = SoftPlusAdd1();
     SoftPlusAdd1 spa_2 = SoftPlusAdd1();
     BetaDist bd = BetaDist();
@@ -43,6 +43,5 @@ private:
 
     Tensor* dx_1 = nullptr;
     Tensor* dx_2 = nullptr;
-    Tensor* dx_3 = nullptr;
     Tensor* dx_sum = nullptr;
 };
