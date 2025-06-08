@@ -29,6 +29,10 @@ python3 ../test_gen/fc_test_gen.py
 
 python3 ../test_gen/softplus_test_gen.py 
  ./test_softplus_add1 
+
+# Only test forward
+python3 ../test_gen/beta_dist_test_gen.py
+./test_beta_dist 
 ```
 
 ## Performance Analysis

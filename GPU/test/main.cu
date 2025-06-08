@@ -93,7 +93,7 @@ int main() {
         if (i%100 == 0) {
             CUDA_CALL(cudaMemcpy(host_error.data(), error.data, host_error.size()*sizeof(float), cudaMemcpyDeviceToHost));
             float mean_error = std::accumulate(host_error.begin(), host_error.end(), 0.0) / host_error.size();
-            std::cout << "Loss: " << mean_error << " \n";
+            std::cout << "Loss: " << std::abs(mean_error) << " \n";
 
             if (mean_error == 0.0) break;
         }

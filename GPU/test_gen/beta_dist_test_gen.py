@@ -26,44 +26,20 @@ with open("beta_dist_logp.txt", "w") as f:
 with open("beta_dist_entropy.txt", "w") as f:
     f.write(" ".join(map(str, entropy)))
 
-dlogp = torch.ones(B, dtype=torch.float32, requires_grad=True) + 1
-dh = torch.ones(B, dtype=torch.float32, requires_grad=True) + 1
-# action = (torch.arange(total, dtype=torch.float32, requires_grad=True).reshape(B, dim) + 1) / (total + 2)
-with torch.no_grad():
-    action = dist.rsample()
-logp = dist.log_prob(action).sum(-1)
-entropy = dist.entropy().sum(-1)
+# de = torch.ones(B, dtype=torch.float32, requires_grad=True) + 1
+# with torch.no_grad():
+#     action = dist.rsample()
+# logp = dist.log_prob(action).sum(-1)
+# entropy = dist.entropy().sum(-1)
 
-# grad_x = torch.autograd.grad(outputs=entropy, inputs=(alpha, beta), grad_outputs=dh)
-# da_h, db_h = grad_x
-# grad_x = torch.autograd.grad(outputs=logp, inputs=(alpha, beta), grad_outputs=dlogp)
-# da_logp, db_logp = grad_x
 # grad_x = torch.autograd.grad(outputs=(logp, entropy), inputs=(alpha, beta), grad_outputs=(dlogp, dh))
-grad_x = torch.autograd.grad(outputs=(logp, entropy), inputs=(alpha, beta), grad_outputs=(dlogp, dh))
-da, db = grad_x
-# print(da.mean(), db.mean())
+# da, db = grad_x
+# # print(da.mean(), db.mean())
 
+# da = list(da.detach().numpy().flatten())
+# db = list(db.detach().numpy().flatten())
+# with open("beta_dist_da.txt", "w") as f:
+#     f.write(" ".join(map(str, da)))
 
-# da_logp = list(da_logp.detach().numpy().flatten())
-# db_logp = list(db_logp.detach().numpy().flatten())
-# da_h = list(da_h.detach().numpy().flatten())
-# db_h = list(db_h.detach().numpy().flatten())
-# with open("beta_dist_da_logp.txt", "w") as f:
-#     f.write(" ".join(map(str, da_logp)))
-
-# with open("beta_dist_db_logp.txt", "w") as f:
-#     f.write(" ".join(map(str, db_logp)))
-
-# with open("beta_dist_da_h.txt", "w") as f:
-#     f.write(" ".join(map(str, da_h)))
-
-# with open("beta_dist_db_h.txt", "w") as f:
-#     f.write(" ".join(map(str, db_h)))
-
-da = list(da.detach().numpy().flatten())
-db = list(db.detach().numpy().flatten())
-with open("beta_dist_da.txt", "w") as f:
-    f.write(" ".join(map(str, da)))
-
-with open("beta_dist_db.txt", "w") as f:
-    f.write(" ".join(map(str, db)))
+# with open("beta_dist_db.txt", "w") as f:
+#     f.write(" ".join(map(str, db)))

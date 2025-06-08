@@ -104,21 +104,21 @@ target_link_libraries(test_fc
         ${CUDNN_LIBRARY}
 )
 
-# # Beta Dist Test
-# add_executable(test_beta_dist test/test_beta_dist.cpp src/beta_dist.cu src/tensor.cpp)
+# Beta Dist Test
+add_executable(test_beta_dist test/test_beta_dist.cpp src/beta_dist.cu src/tensor.cpp)
 
-# target_include_directories(test_beta_dist
-#     PRIVATE
-#         ${PROJECT_SOURCE_DIR}/include
-# )
+target_include_directories(test_beta_dist
+    PRIVATE
+        ${PROJECT_SOURCE_DIR}/include
+)
 
-# target_link_libraries(test_beta_dist
-#     PRIVATE
-#         CUDA::cudart
-#         CUDA::curand
-#         CUDA::cublas
-#         ${CUDNN_LIBRARY}
-# )
+target_link_libraries(test_beta_dist
+    PRIVATE
+        CUDA::cudart
+        CUDA::curand
+        CUDA::cublas
+        ${CUDNN_LIBRARY}
+)
 
 # # Policy Test
 # add_executable(test_policy test/test_policy.cpp src/policy.cu src/beta_dist.cu src/fc.cu src/conv.cpp src/softplus_add1.cu src/relu.cpp src/tensor.cpp src/parameter.cpp)
