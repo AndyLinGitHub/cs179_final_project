@@ -47,6 +47,14 @@ python3 ../test_gen/beta_dist_test_gen.py
 The CUDA kernels speed up the backward pass, yet the forward pass remains sluggish—most likely because tensors are laid out in row-major rather than column-major order. This choice mis-aligns memory accesses for forward kernels, causing non-coalesced global reads/writes and extra register spilling that throttle performance. Conversely, backward propagation often involves matrix transposes, so a row-major layout can actually align those memory accesses and partially explain the backward-pass gains.
 
 ## Potential Improvements
+- **Modular, Config-Driven Architecture with Modern Algorithms**
+   Replace the hard-coded layer sequence in the forward and backward passes with a fully modular design driven by a concise configuration file (e.g., YAML or JSON). This declarative approach simplifies experimentation, enables automated hyper-parameter searches, and future-proofs the codebase. At the same time, broaden the framework’s reach by adding two industry-standard policy-gradient methods—Proximal Policy Optimization (PPO) and Soft Actor–Critic (SAC).
+
+- **Automated Bottleneck Analysis for Memory Layout**
+   Embed a lightweight profiling warm-up that inspects memory-access patterns across the computation graph, pinpoints hotspots, and automatically decides whether each intermediate tensor should be stored in row-major or column-major order. Aligning tensor layouts with cache behavior can accelerate both forward and backward propagation beyond vanilla PyTorch, all without manual tuning.
+
+- **Real-Time Training Dashboard**
+   Integrate a live GUI that streams key metrics—loss curves, reward trajectories, policy distributions, and convergence diagnostics—so users can immediately see how target settings and hyper-parameters influence learning dynamics during training.
 
 
 
