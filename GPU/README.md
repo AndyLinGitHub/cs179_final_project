@@ -43,5 +43,10 @@ python3 ../test_gen/beta_dist_test_gen.py
     - Conv Backward	0.05x
     - Softplus Forward 1x
     - Softplus Backward 0.0001x
-    
+
+The CUDA kernels speed up the backward pass, yet the forward pass remains sluggish—most likely because tensors are laid out in row-major rather than column-major order. This choice mis-aligns memory accesses for forward kernels, causing non-coalesced global reads/writes and extra register spilling that throttle performance. Conversely, backward propagation often involves matrix transposes, so a row-major layout can actually align those memory accesses and partially explain the backward-pass gains.
+
 ## Potential Improvements
+
+
+
