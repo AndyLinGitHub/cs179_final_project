@@ -137,7 +137,7 @@ target_link_libraries(test_fc
 #         ${CUDNN_LIBRARY}
 # )
 
-# PPO Test
+# Main Test
 add_executable(main test/main.cu src/utils.cu src/policy.cu src/beta_dist.cu src/fc.cu src/conv.cpp src/softplus_add1.cu src/relu.cpp src/tensor.cpp src/parameter.cpp)
 target_compile_definitions(main PRIVATE)
 
