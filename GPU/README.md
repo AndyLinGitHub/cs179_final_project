@@ -6,8 +6,6 @@ mkdir build
 cd build
 cmake ..
 make -j$(nproc)
-
-./main
 ```
 
 ## Project Description and Features
@@ -18,7 +16,20 @@ make -j$(nproc)
 
 
 ## Expected Results
-- Pregenerate test cases using python
+```
+# Expect to see the loss decreasing gradually during training. 
+./main
+
+# The forward and backward results are expected to be the same as those output from Pytorch. 
+python3 ../test_gen/conv_test_gen.py
+./test_conv
+
+python3 ../test_gen/fc_test_gen.py
+./test_fc
+
+python3 ../test_gen/softplus_test_gen.py 
+ ./test_softplus_add1 
+```
 
 ## Performance Analysis
 ## Potential Improvements
