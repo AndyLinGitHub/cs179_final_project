@@ -40,5 +40,5 @@ python3 ../test_gen/beta_dist_test_gen.py
     - FC Forward 100x
     - FC Backward 0.02x
     - Conv Forward 70x
-    - Conv Backward	0.05
+    - Conv Backward	0.05x
 ## Potential Improvements
