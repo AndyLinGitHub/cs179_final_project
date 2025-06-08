@@ -36,4 +36,9 @@ python3 ../test_gen/beta_dist_test_gen.py
 ```
 
 ## Performance Analysis
+- Latency comapres to Pytorch (CPU)
+    - FC Forward 100x
+    - FC Backward 0.02x
+    - Conv Forward 70x
+    - Conv Backward	0.05
 ## Potential Improvements
